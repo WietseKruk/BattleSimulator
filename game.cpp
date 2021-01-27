@@ -17,7 +17,7 @@
 #define MAX_FRAMES 2000
 
 //Global performance timer
-#define REF_PERFORMANCE 39167 //UPDATE THIS WITH YOUR REFERENCE PERFORMANCE (see console after 2k frames)
+#define REF_PERFORMANCE 37595 //UPDATE THIS WITH YOUR REFERENCE PERFORMANCE (see console after 2k frames)
 static timer perf_timer;
 static float duration;
 
@@ -46,39 +46,18 @@ const static vec2 rocket_size(25, 24);
 const static float tank_radius = 8.5f;
 const static float rocket_radius = 10.f;
 
+ThreadPool tp(std::thread::hardware_concurrency());
+
 // -----------------------------------------------------------
 // Initialize the application
 // -----------------------------------------------------------
 void Game::init()
 {
+    Tank* dum = new Tank(SCRWIDTH / 2, SCRHEIGHT / 2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
+    root = new node();
+    root->tank = dum;
+
     frame_count_font = new Font("assets/digital_small.png", "ABCDEFGHIJKLMNOPQRSTUVWXYZ:?!=-0123456789.");
-
-    /*const int cols = 15;
-    const int rows = 8;
-    vec2 grid[rows][cols];
-    int gridStart = 0;
-    float gridX;
-    float gridY;
-
-    for (size_t i = 0; i < rows; i++)
-    {
-        gridY += 80;
-        for (size_t j = 0; j < cols; j++)
-        {
-            gridX += 80;
-            vec2 gridBlock(gridX, gridY);
-            grid[i][j] = gridBlock;
-        }
-    }
-    
-    for (size_t i = 0; i < rows; i++)
-    {
-        for (size_t j = 0; j < cols; j++)
-        {
-            std::cout << grid[i][j] << " ";
-        }
-        std::cout << "\n";
-    }*/
 
     tanks.reserve(NUM_TANKS_BLUE + NUM_TANKS_RED);
 
@@ -149,11 +128,20 @@ Tank& Game::find_closest_enemy(Tank& current_tank)
 // -----------------------------------------------------------
 void Game::update(float deltaTime)
 {
+
     //Update tanks
     for (Tank& tank : tanks)
     {
         if (tank.active)
         {
+            //memory leak
+           /* if (root->left || root->right)
+            {
+                root->left = NULL;
+                root->right = NULL;
+            }
+            root->insertNode(&tank, 0);*/
+            
             //Check tank collision and nudge tanks away from each other
             for (Tank& oTank : tanks)
             {
@@ -173,6 +161,7 @@ void Game::update(float deltaTime)
 
             //Move tanks according to speed and nudges (see above) also reload
             tank.tick();
+            
 
             //Shoot at closest target if reloaded
             if (tank.rocket_reloaded())
@@ -183,6 +172,7 @@ void Game::update(float deltaTime)
 
                 tank.reload_rocket();
             }
+            
         }
     }
 
@@ -264,26 +254,31 @@ void Game::draw()
             background.get_buffer()[(int)tPos.x + (int)tPos.y * SCRWIDTH] = sub_blend(background.get_buffer()[(int)tPos.x + (int)tPos.y * SCRWIDTH], 0x808080);
     }
 
-    for (Rocket& rocket : rockets)
-    {
-        rocket.draw(screen);
-    }
+    std::future<void> fut1 = tp.enqueue([&]() {
+        for (Rocket& rocket : rockets){
+            rocket.draw(screen);
+        }
+    });
 
-    for (Smoke& smoke : smokes)
-    {
-        smoke.draw(screen);
-    }
+    std::future<void> fut2 = tp.enqueue([&]() {
+        for (Smoke& smoke : smokes){
+            smoke.draw(screen);
+        } 
+    });
 
-    for (Particle_beam& particle_beam : particle_beams)
-    {
-        particle_beam.draw(screen);
-    }
+    std::future<void> fut3 = tp.enqueue([&]() {
+        for (Particle_beam& particle_beam : particle_beams) {
+            particle_beam.draw(screen);
+        }
+    });
 
-    for (Explosion& explosion : explosions)
-    {
-        explosion.draw(screen);
-    }
+    std::future<void> fut4 = tp.enqueue([&]() {
+        for (Explosion& explosion : explosions) {
+            explosion.draw(screen);
+        }
+    });
 
+    
     //Draw sorted health bars
     for (int t = 0; t < 2; t++)
     {
@@ -296,8 +291,14 @@ void Game::draw()
             sorted_tanks.push_back(&tanks[i]);
         }
 
+        //std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS); });
+        //fut1.wait();
+        //thread t1([&]() { merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS); });
+        //t1.join();
+        /*sorted_tanks = mergeSort(sorted_tanks);*/
+        //mergeSort(sorted_tanks, begin, begin + NUM_TANKS);
+
         merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS);
-        
 
         for (int i = 0; i < NUM_TANKS; i++)
         {
@@ -310,49 +311,153 @@ void Game::draw()
             screen->bar(health_bar_start_x, health_bar_start_y + (int)((double)HEALTH_BAR_HEIGHT * (1 - ((double)sorted_tanks.at(i)->health / (double)TANK_MAX_HEALTH))), health_bar_end_x, health_bar_end_y, GREENMASK);
         }
     }
+
+    fut1.wait();
+    fut2.wait();
+    fut3.wait();
+    fut4.wait();
 }
 
-// -----------------------------------------------------------
-// Sort tanks by health value using insertion sort
-// -----------------------------------------------------------
-//void Tmpl8::Game::insertion_sort_tanks_health(const std::vector<Tank>& original, std::vector<const Tank*>& sorted_tanks, int begin, int end)
+
+void buildKDTree(vector<Tank> tanks) {
+    node* centre = new node();
+    Tank* dum = new Tank(SCRWIDTH/2, SCRHEIGHT/2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
+    centre->insertNode(dum, 0);
+
+    for (int i = 0; i < tanks.size(); i++)
+    {
+    node* n = new node();
+    n->insertNode(&tanks[i], 0);
+    }
+}
+
+
+//vector<Tank*> Tmpl8::Game::merge(vector<Tank*> left, vector<Tank*> right)
 //{
-//    const int NUM_TANKS = end - begin;
-//    sorted_tanks.reserve(NUM_TANKS);
-//    sorted_tanks.emplace_back(&original.at(begin));
+//    vector<Tank*> result;
+//    result.reserve(NUM_TANKS_RED);
 //
-//    for (int i = begin + 1; i < (begin + NUM_TANKS); i++)
+//    while ((int)left.size() > 0 || (int)right.size() > 0)
 //    {
-//        const Tank& current_tank = original.at(i);
-//
-//        for (int s = (int)sorted_tanks.size() - 1; s >= 0; s--)
+//        if ((int)left.size() > 0 && (int)right.size() > 0)
 //        {
-//            const Tank* current_checking_tank = sorted_tanks.at(s);
-//
-//            if ((current_checking_tank->compare_health(current_tank) <= 0))
+//            if (left.front()->health <= right.front()->health)
 //            {
-//                sorted_tanks.insert(1 + sorted_tanks.begin() + s, &current_tank);
-//                break;
+//                result.push_back(left.front());
+//                left.erase(left.begin());
 //            }
-//
-//            if (s == 0)
+//            else
 //            {
-//                sorted_tanks.insert(sorted_tanks.begin(), &current_tank);
-//                break;
+//                result.push_back(right.front());
+//                right.erase(right.begin());
 //            }
 //        }
+//        else if ((int)left.size() > 0)
+//        {
+//            for (int i = 0; i < (int)left.size(); i++)
+//                result.push_back(left[i]);
+//            break;
+//        }
+//        else if ((int)right.size() > 0)
+//        {
+//            for (int i = 0; i < (int)right.size(); i++)
+//                result.push_back(right[i]);
+//            break;
+//        }
+//    }
+//    return result;
+//}
+
+//vector<Tank*> Tmpl8::Game::mergeSort(vector<Tank*> m)
+//{
+//    if (m.size() <= 1)
+//        return m;
+//
+//    vector<Tank*> left, right, result;
+//    left.reserve((int)m.size() / 2);
+//    right.reserve((int)m.size() / 2);
+//    result.reserve(NUM_TANKS_RED);
+//
+//    int middle = ((int)m.size() + 1) / 2;
+//
+//    for (int i = 0; i < middle; i++)
+//    {
+//        left.push_back(m[i]);
+//    }
+//
+//    for (int i = middle; i < (int)m.size(); i++)
+//    {
+//        right.push_back(m[i]);
+//    }
+//
+//    left = mergeSort(left);
+//    right = mergeSort(right);
+//    result = merge(left, right);
+//
+//    return result;
+//}
+
+//
+//void Tmpl8::Game::merge(std::vector<Tank*>& sorted_tanks, int l, int m, int r) {
+//    int i, j, k;
+//    std::vector<Tank*> vec;
+//
+//    i = l;
+//    k = l;
+//    j = m + 1;
+//
+//    while (i <= m && j <= r)
+//    {
+//        if (sorted_tanks.at(i)->health < sorted_tanks.at(j)->health)
+//        {
+//            vec.push_back(sorted_tanks.at(i));
+//            k++;
+//            i++;
+//        }
+//        else
+//        {
+//            vec.push_back(sorted_tanks.at(j));
+//            k++;
+//            j++;
+//        }
+//    }
+//    while (i <= m)
+//    {
+//        vec.at(k) = sorted_tanks.at(i);
+//        k++;
+//        i++;
+//    }
+//    while (j <= r)
+//    {
+//        vec.at(k) = sorted_tanks.at(j);
+//        k++;
+//        j++;
+//    }
+//    for (i = l; i < k; i++) {
+//        sorted_tanks.at(i) = vec.at(i);
 //    }
 //}
 
- 
-//right vector op nieuwe thread
+//void Tmpl8::Game::mergeSort(std::vector<Tank*>& sorted_tanks, int l, int r) {
+//    
+//    if (l < r) {
+//        int m = (l + r - 1) / 2;
+//
+//        mergeSort(sorted_tanks, l, m);
+//        mergeSort(sorted_tanks, m + 1, r);
+//        merge(sorted_tanks, l, m, r);
+//    }
+//}
+
+
+
 void Tmpl8::Game::merge_tanks_health(std::vector<Tank*> v1, std::vector<Tank*> v2, std::vector<Tank*>& sorted_tanks, int begin, int end)
 {
 
     sorted_tanks.clear();
-    int v1_index, v2_index = 0;
+    int v1_index = 0;
+    int v2_index = 0;
     
-
     while (v1_index <= (int)v1.size() || v2_index <= (int)v2.size())
     {
         if ((int)v1.size() > v1_index && (int)v2.size() > v2_index)
@@ -386,7 +491,6 @@ void Tmpl8::Game::merge_tanks_health(std::vector<Tank*> v1, std::vector<Tank*> v
 }
 
 
-
 void Tmpl8::Game::merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int begin, int end)
 {
 
@@ -397,19 +501,32 @@ void Tmpl8::Game::merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int 
 
     std::vector<Tank*> left, right;
 
+    left.reserve(end);
+    right.reserve(end);
+
     int middle = (int)sorted_tanks.size() / 2;
+
     for (int i = 0; i < middle; i++)
     {
         left.push_back(sorted_tanks.at(i));
     }
+
     for (int i = middle; i < (int)sorted_tanks.size(); i++)
     {
         right.push_back(sorted_tanks.at(i));
     }
+    
+    /*std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(left, 0, (int)left.size()); });*/
+    //std::future<void> fut2 = tp.enqueue([&]() { merge_sort_tanks_health(right, 0, (int)right.size()); });
+    //
+    //fut2.wait();
+    /*thread t1([&]() { merge_sort_tanks_health(right, 0, (int)right.size()); });*/
+    /*std::thread left(merge_sort_tanks_health(sorted_tanks, begin, end), left, 0, (int)left.size());*/
 
     merge_sort_tanks_health(left, 0, (int)left.size());
     merge_sort_tanks_health(right, 0, (int)right.size());
     merge_tanks_health(left, right, sorted_tanks, begin, end);
+
 }
 
 
@@ -454,10 +571,14 @@ void Game::tick(float deltaTime)
     {
         update(deltaTime);
     }
+
+   /* std::future<void> fut = tp.enqueue([&]() { draw(); });
+    fut.wait();*/
+
     draw();
 
     measure_performance();
-
+    
     // print something in the graphics window
     //screen->Print("hello world", 2, 2, 0xffffff);
 
