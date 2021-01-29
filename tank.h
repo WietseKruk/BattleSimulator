@@ -21,6 +21,9 @@ class Tank
     vec2 get_position() const { return position; };
     float get_collision_radius() const { return collision_radius; };
     bool rocket_reloaded() const { return reloaded; };
+    void setCurrTileIn(int index);
+    int getCurrTileIn() { return tileIndex; };
+    void setIndex(int index);
 
     void reload_rocket();
 
@@ -53,6 +56,9 @@ class Tank
     int current_frame;
     Sprite* tank_sprite;
     Sprite* smoke_sprite;
+
+    int tileIndex;
+    int index;
 
 };
 

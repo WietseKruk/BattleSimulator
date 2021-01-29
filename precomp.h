@@ -11,6 +11,14 @@
 #define SCRWIDTH 1280
 #define SCRHEIGHT 720
 
+#define ROWS 9
+#define COLS 7
+
+//#define tileX SCRWIDTH / COLS;
+//#define tileY (SCRHEIGHT / ROWS);
+
+#define maxThreads std::thread::hardware_concurrency()
+
 // #define FULLSCREEN
 // #define ADVANCEDGL	// faster if your system supports it
 
@@ -84,6 +92,9 @@ using namespace Tmpl8;
 #include "explosion.h"
 #include "particle_beam.h"
 #include "node.h"
+#include "Tile.h"
+#include "Grid.h"
+
 
 #include "game.h"
 

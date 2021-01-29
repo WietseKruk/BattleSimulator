@@ -99,4 +99,12 @@ void Tank::push(vec2 direction, float magnitude)
     force += direction * magnitude;
 }
 
+void Tank::setCurrTileIn(int tileIndex) {
+    this->tileIndex = tileIndex;
+}
+
+void Tank::setIndex(int index) {
+    this->index = index;
+}
+
 } // namespace Tmpl8

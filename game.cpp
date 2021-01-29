@@ -46,16 +46,17 @@ const static vec2 rocket_size(25, 24);
 const static float tank_radius = 8.5f;
 const static float rocket_radius = 10.f;
 
-ThreadPool tp(std::thread::hardware_concurrency());
+ThreadPool tp(maxThreads);
+Grid* grid;
 
 // -----------------------------------------------------------
 // Initialize the application
 // -----------------------------------------------------------
 void Game::init()
 {
-    Tank* dum = new Tank(SCRWIDTH / 2, SCRHEIGHT / 2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
-    root = new node();
-    root->tank = dum;
+    //Tank* dum = new Tank(SCRWIDTH / 2, SCRHEIGHT / 2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
+    //root = new node();
+    //root->tank = dum;
 
     frame_count_font = new Font("assets/digital_small.png", "ABCDEFGHIJKLMNOPQRSTUVWXYZ:?!=-0123456789.");
 
@@ -86,6 +87,9 @@ void Game::init()
     particle_beams.push_back(Particle_beam(vec2(SCRWIDTH / 2, SCRHEIGHT / 2), vec2(100, 50), &particle_beam_sprite, PARTICLE_BEAM_HIT_VALUE));
     particle_beams.push_back(Particle_beam(vec2(80, 80), vec2(100, 50), &particle_beam_sprite, PARTICLE_BEAM_HIT_VALUE));
     particle_beams.push_back(Particle_beam(vec2(1200, 600), vec2(100, 50), &particle_beam_sprite, PARTICLE_BEAM_HIT_VALUE));
+
+    grid = new Grid(tanks);
+    fillGrid();
 }
 
 // -----------------------------------------------------------
@@ -128,6 +132,7 @@ Tank& Game::find_closest_enemy(Tank& current_tank)
 // -----------------------------------------------------------
 void Game::update(float deltaTime)
 {
+    /*grid->updateTanks();*/
 
     //Update tanks
     for (Tank& tank : tanks)
@@ -135,29 +140,41 @@ void Game::update(float deltaTime)
         if (tank.active)
         {
             //memory leak
-           /* if (root->left || root->right)
-            {
-                root->left = NULL;
-                root->right = NULL;
-            }
-            root->insertNode(&tank, 0);*/
-            
+           //if (root->left || root->right)
+           // {
+           //     root->left = NULL;
+           //     root->right = NULL;
+           // }
+           // root->insertNode(&tank, 0);
+
+            vector<Tile*> surrTiles = grid->getAdjacentTiles(tank.getCurrTileIn());
+           
             //Check tank collision and nudge tanks away from each other
-            for (Tank& oTank : tanks)
-            {
-                if (&tank == &oTank) continue;
-                
-                vec2 dir = tank.get_position() - oTank.get_position();
-                float dirSquaredLen = dir.sqr_length();
+            for (int i = 0; i < surrTiles.size(); i++)
+            { 
+                vector<Tank*> tTanks = surrTiles[i]->getTanks();
 
-                float colSquaredLen = (tank.get_collision_radius() + oTank.get_collision_radius());
-                colSquaredLen *= colSquaredLen;
-
-                if (dirSquaredLen < colSquaredLen)
+                for (Tank* oTank : tTanks)
                 {
-                    tank.push(dir.normalized(), 1.f);
+                    if (&tank == oTank) continue;
+
+                    vec2 dir = tank.get_position() - oTank->get_position();
+                    float dirSquaredLen = dir.sqr_length();
+
+                    float colSquaredLen = (tank.get_collision_radius() + oTank->get_collision_radius());
+                    colSquaredLen *= colSquaredLen;
+
+                    if (dirSquaredLen < colSquaredLen)
+                    {
+                        tank.push(dir.normalized(), 1.f);
+                    }
                 }
+
             }
+            //alle tanks van deze tile op deze tileindex
+
+            
+            
 
             //Move tanks according to speed and nudges (see above) also reload
             tank.tick();
@@ -185,23 +202,53 @@ void Game::update(float deltaTime)
     //Update rockets
     for (Rocket& rocket : rockets)
     {
-        rocket.tick();
-
-        //Check if rocket collides with enemy tank, spawn explosion and if tank is destroyed spawn a smoke plume
-        for (Tank& tank : tanks)
+        if (rocket.active)
         {
-            if (tank.active && (tank.allignment != rocket.allignment) && rocket.intersects(tank.position, tank.collision_radius))
+            float tileX = SCRWIDTH / grid->getGridSize().x;
+            float tileY = SCRHEIGHT / grid->getGridSize().y;
+
+            rocket.tick();
+
+            vector<Tile*> adjTiles = grid->getAdjacentTiles(rocket.getCurrTileIn(tileX, tileY));
+
+            vector<Tank*> targTanks;
+
+            for (Tile* adjTile : adjTiles)
             {
-                explosions.push_back(Explosion(&explosion, tank.position));
+                 targTanks = adjTile->getTanks();
 
-                if (tank.hit(ROCKET_HIT_VALUE))
-                {
-                    smokes.push_back(Smoke(smoke, tank.position - vec2(0, 48)));
-                }
+                 for (Tank* tank : targTanks)
+                 {
+                     if (tank->active && (tank->allignment != rocket.allignment) && rocket.intersects(tank->position, tank->collision_radius))
+                     {
+                         explosions.push_back(Explosion(&explosion, tank->position));
 
-                rocket.active = false;
-                break;
+                         if (tank->hit(ROCKET_HIT_VALUE))
+                         {
+                             smokes.push_back(Smoke(smoke, tank->position - vec2(0, 48)));
+                         }
+
+                         rocket.active = false;
+                         break;
+                     }
+                 }
             }
+                //Check if rocket collides with enemy tank, spawn explosion and if tank is destroyed spawn a smoke plume
+               /* for (Tank& tank : tanks)
+                {
+                    if (tank.active && (tank.allignment != rocket.allignment) && rocket.intersects(tank.position, tank.collision_radius))
+                    {
+                        explosions.push_back(Explosion(&explosion, tank.position));
+
+                        if (tank.hit(ROCKET_HIT_VALUE))
+                        {
+                            smokes.push_back(Smoke(smoke, tank.position - vec2(0, 48)));
+                        }
+
+                        rocket.active = false;
+                        break;
+                    }
+                }*/
         }
     }
 
@@ -291,14 +338,7 @@ void Game::draw()
             sorted_tanks.push_back(&tanks[i]);
         }
 
-        //std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS); });
-        //fut1.wait();
-        //thread t1([&]() { merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS); });
-        //t1.join();
-        /*sorted_tanks = mergeSort(sorted_tanks);*/
-        //mergeSort(sorted_tanks, begin, begin + NUM_TANKS);
-
-        merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS);
+        merge_sort_tanks_health(sorted_tanks, begin, begin + NUM_TANKS, 0);
 
         for (int i = 0; i < NUM_TANKS; i++)
         {
@@ -319,17 +359,17 @@ void Game::draw()
 }
 
 
-void buildKDTree(vector<Tank> tanks) {
-    node* centre = new node();
-    Tank* dum = new Tank(SCRWIDTH/2, SCRHEIGHT/2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
-    centre->insertNode(dum, 0);
-
-    for (int i = 0; i < tanks.size(); i++)
-    {
-    node* n = new node();
-    n->insertNode(&tanks[i], 0);
-    }
-}
+//void buildKDTree(vector<Tank> tanks) {
+//    node* centre = new node();
+//    Tank* dum = new Tank(SCRWIDTH/2, SCRHEIGHT/2, RED, &tank_red, &smoke, 80, 80, tank_radius, TANK_MAX_HEALTH, TANK_MAX_SPEED);
+//    centre->insertNode(dum, 0);
+//
+//    for (int i = 0; i < tanks.size(); i++)
+//    {
+//    node* n = new node();
+//    n->insertNode(&tanks[i], 0);
+//    }
+//}
 
 
 //vector<Tank*> Tmpl8::Game::merge(vector<Tank*> left, vector<Tank*> right)
@@ -491,7 +531,7 @@ void Tmpl8::Game::merge_tanks_health(std::vector<Tank*> v1, std::vector<Tank*> v
 }
 
 
-void Tmpl8::Game::merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int begin, int end)
+void Tmpl8::Game::merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int begin, int end, int depth)
 {
 
     if ((end - begin) <= 1)
@@ -515,18 +555,64 @@ void Tmpl8::Game::merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int 
     {
         right.push_back(sorted_tanks.at(i));
     }
-    
-    /*std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(left, 0, (int)left.size()); });*/
+
+    //std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(left, 0, (int)left.size()); });
     //std::future<void> fut2 = tp.enqueue([&]() { merge_sort_tanks_health(right, 0, (int)right.size()); });
     //
     //fut2.wait();
     /*thread t1([&]() { merge_sort_tanks_health(right, 0, (int)right.size()); });*/
     /*std::thread left(merge_sort_tanks_health(sorted_tanks, begin, end), left, 0, (int)left.size());*/
 
-    merge_sort_tanks_health(left, 0, (int)left.size());
-    merge_sort_tanks_health(right, 0, (int)right.size());
-    merge_tanks_health(left, right, sorted_tanks, begin, end);
+    if (pow(depth, 2) <= maxThreads)
+    {
+        merge_sort_tanks_health(left, 0, (int)left.size(), depth + 1);
+        std::future<void> fut1 = tp.enqueue([&]() { merge_sort_tanks_health(right, 0, (int)right.size(), depth + 1); });
+        fut1.wait();
+    }
+    else
+    {
+        merge_sort_tanks_health(left, 0, (int)left.size(), depth);
+        merge_sort_tanks_health(right, 0, (int)right.size(), depth);
+    }
 
+    merge_tanks_health(left, right, sorted_tanks, begin, end);
+}
+
+void Game::fillGrid() {
+
+    float tileX = SCRWIDTH / grid->getGridSize().x;
+    float tileY = SCRHEIGHT / grid->getGridSize().y;
+
+    int index = 0;
+
+    for (int i = 0; i < tanks.size(); i++)
+    {
+        int indexX;
+        int indexY;
+
+        if (tanks[i].position.x > SCRWIDTH)
+        {
+            indexX = (ROWS - 1);
+        }
+        else
+        {
+            indexX = floor(tanks[i].position.x / tileX);
+        }
+        if (tanks[i].position.y > SCRHEIGHT)
+        {
+            indexY = (COLS - 1);
+        }
+        else
+        {
+            indexY = floor(tanks[i].position.y / tileY);
+        }
+
+        index = ((ROWS * indexY) + indexX);
+
+        grid->getAllTiles()[index]->addTank(&tanks[i]);
+        tanks[i].setCurrTileIn(index);
+        tanks[i].setIndex(i);
+    }
 }
 
 

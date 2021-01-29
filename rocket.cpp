@@ -13,6 +13,32 @@ Rocket::~Rocket()
 {
 }
 
+int Rocket::getCurrTileIn(float tileX, float tileY) {
+
+    int indexX;
+    int indexY;
+    int index;
+
+    if (this->position.x > SCRWIDTH)
+    {
+        indexX = (ROWS - 1);
+    }
+    else
+    {
+        indexX = floor(this->position.x / tileX);
+    }
+    if (this->position.y > SCRHEIGHT)
+    {
+        indexY = (COLS - 1);
+    }
+    else
+    {
+        indexY = floor(this->position.y / tileY);
+    }
+    index = ((ROWS * indexY) + indexX);
+    return index;
+}
+
 void Rocket::tick()
 {
     position += speed;

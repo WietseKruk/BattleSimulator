@@ -18,14 +18,14 @@ class Game
     void update(float deltaTime);
     void draw();
     void tick(float deltaTime);
+    void fillGrid();
     ///*void quick_sort_tanks_health(const std::vector<Tank>& original, std::vector<const Tank*>& sorted_tanks, int begin, int end);*/
-    void merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int begin, int end);
+    void merge_sort_tanks_health(std::vector<Tank*>& sorted_tanks, int begin, int end, int depth);
     void merge_tanks_health(std::vector<Tank*> l, std::vector<Tank*> r, std::vector<Tank*>& sorted_tanks, int begin, int end);
     void mergeSort(std::vector<Tank*>& sorted_tanks, int l, int r);
     void merge(std::vector<Tank*>& sorted_tanks, int l, int m, int r);
     vector<Tank*> mergeSort(vector<Tank*> sorted_tanks);
     vector<Tank*> merge(vector<Tank*> left, vector<Tank*> right);
-    void fill_vector(vector<Tank*> sorted_tanks, vector<Tank*> vec, int begin, int end);
     void measure_performance();
     Tank& find_closest_enemy(Tank& current_tank);
 
@@ -52,7 +52,7 @@ class Game
   private:
     Surface* screen;
 
-    node* root;
+    /*node* root;*/
 
     vector<Tank> tanks;
     vector<Rocket> rockets;
