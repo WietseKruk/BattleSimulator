@@ -88,7 +88,7 @@ void Game::init()
     particle_beams.push_back(Particle_beam(vec2(80, 80), vec2(100, 50), &particle_beam_sprite, PARTICLE_BEAM_HIT_VALUE));
     particle_beams.push_back(Particle_beam(vec2(1200, 600), vec2(100, 50), &particle_beam_sprite, PARTICLE_BEAM_HIT_VALUE));
 
-    grid = new Grid(tanks);
+    grid = new Grid(vec2(ROWS, COLS), tanks);
     fillGrid();
 }
 
@@ -132,7 +132,7 @@ Tank& Game::find_closest_enemy(Tank& current_tank)
 // -----------------------------------------------------------
 void Game::update(float deltaTime)
 {
-    /*grid->updateTanks();*/
+    grid->updateTanks();
 
     //Update tanks
     for (Tank& tank : tanks)
@@ -171,8 +171,6 @@ void Game::update(float deltaTime)
                 }
 
             }
-            //alle tanks van deze tile op deze tileindex
-
             
             
 
@@ -204,18 +202,15 @@ void Game::update(float deltaTime)
     {
         if (rocket.active)
         {
+            rocket.tick();
+
+            if (rocket.active) {
+
             float tileX = SCRWIDTH / grid->getGridSize().x;
             float tileY = SCRHEIGHT / grid->getGridSize().y;
 
-            rocket.tick();
-
-            vector<Tile*> adjTiles = grid->getAdjacentTiles(rocket.getCurrTileIn(tileX, tileY));
-
-            vector<Tank*> targTanks;
-
-            for (Tile* adjTile : adjTiles)
-            {
-                 targTanks = adjTile->getTanks();
+            Tile* currTile = grid->getCurrTile(rocket.getCurrTileIn(tileX, tileY));
+            vector<Tank*> targTanks = currTile->getTanks();
 
                  for (Tank* tank : targTanks)
                  {
@@ -233,22 +228,7 @@ void Game::update(float deltaTime)
                      }
                  }
             }
-                //Check if rocket collides with enemy tank, spawn explosion and if tank is destroyed spawn a smoke plume
-               /* for (Tank& tank : tanks)
-                {
-                    if (tank.active && (tank.allignment != rocket.allignment) && rocket.intersects(tank.position, tank.collision_radius))
-                    {
-                        explosions.push_back(Explosion(&explosion, tank.position));
 
-                        if (tank.hit(ROCKET_HIT_VALUE))
-                        {
-                            smokes.push_back(Smoke(smoke, tank.position - vec2(0, 48)));
-                        }
-
-                        rocket.active = false;
-                        break;
-                    }
-                }*/
         }
     }
 
@@ -651,15 +631,14 @@ void Tmpl8::Game::measure_performance()
 // -----------------------------------------------------------
 // Main application tick function
 // -----------------------------------------------------------
+
 void Game::tick(float deltaTime)
 {
+    
     if (!lock_update)
     {
         update(deltaTime);
-    }
-
-   /* std::future<void> fut = tp.enqueue([&]() { draw(); });
-    fut.wait();*/
+    } 
 
     draw();
 
@@ -675,4 +654,5 @@ void Game::tick(float deltaTime)
     frame_count++;
     string frame_count_string = "FRAME: " + std::to_string(frame_count);
     frame_count_font->print(screen, frame_count_string.c_str(), 350, 580);
+    
 }

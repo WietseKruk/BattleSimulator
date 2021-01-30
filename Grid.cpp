@@ -1,26 +1,20 @@
 #include "precomp.h"
-#include "Grid.h"
 
-Grid::Grid(vector<Tank> tanks)
+Grid::Grid(vec2 gridSize, vector<Tank> tanks)
 {
     this->tanks = tanks;
-    gridSize.x = ROWS;
-    gridSize.y = COLS;
+    this->gridSize = gridSize;
     createGrid();
 }
 
-
 void Grid::createGrid() {
-    for (int i = 0; i < ROWS; i++)
+
+    for (int i = 0; i < gridSize.y; i++)
     {
-        for (int j = 0; j < COLS; j++)
+        for (int j = 0; j < gridSize.x; j++)
         {
-            vec2 pos;
-            pos.x = i;
-            pos.y = j;
-            Tile* tile = new Tile(pos, tileIndex);
+            Tile* tile = new Tile(vec2(j,i));
             tiles.push_back(tile);
-            tileIndex++;
         }
     }
 }
@@ -29,15 +23,13 @@ vector<Tile*> Grid::getAdjacentTiles(int index) {
 
     vector<Tile*> adjTiles;
     adjTiles.reserve(9);
-
-    Tile* currTile = getCurrTile(index);  
+    Tile* currTile = getCurrTile(index);
     
     int currPosX = floor(currTile->getPos().x);
     int currPosY = floor(currTile->getPos().y);
 
     int posX;
     int posY;
-
     int diffX;
     int diffY;
 
@@ -60,22 +52,53 @@ vector<Tile*> Grid::getAdjacentTiles(int index) {
 
 Tile* Grid::getCurrTile(int index) {
 
+    vec2 pos = getAllTiles()[index]->getPos();
+
     for (Tile* tile : tiles)
     {
-        int indexDif = index - tile->getIndex();
-
-        if (indexDif == 0)
+        if (pos.x == tile->getPos().x && pos.y == tile->getPos().y)
         {
             return tile;
         }
     }
-    
+
+    return NULL;
+}
+
+int Grid::getTileIndex(vec2 pos) {
+    int indexX;
+    int indexY;
+    int index;
+
+    if (pos.x > SCRWIDTH)
+    {
+        indexX = (ROWS - 1);
+    }
+    else
+    {
+        indexX = floor(pos.x / (SCRWIDTH / gridSize.x));
+    }
+
+    if (pos.y > SCRHEIGHT)
+    {
+        indexY = (COLS - 1);
+    }
+    else
+    {
+        indexY = floor(pos.y / (SCRWIDTH / gridSize.x));
+    }
+    index = ((ROWS * indexY) + indexX);
+    return index;
 }
 
 void Grid::updateTanks() {
 
     float tileX = SCRWIDTH / gridSize.x;
     float tileY = SCRHEIGHT / gridSize.y;
+
+    int index;
+    int indexX;
+    int indexY;
 
     for (int i = 0; i < tiles.size(); i++)
     {

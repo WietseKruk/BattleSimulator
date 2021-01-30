@@ -43,7 +43,7 @@ void Rocket::tick()
 {
     position += speed;
     if (++current_frame > 8) current_frame = 0; 
-    if (position[0] > SCRWIDTH || position[1] > SCRHEIGHT || position[0] < 0 || SCRWIDTH < 0) this->active = false;
+    if (position[0] > SCRWIDTH || position[1] > SCRHEIGHT || position[0] < 0 || position[1] < 0) this->active = false;
 }
 
 //Draw the sprite with the facing based on this rockets movement direction

@@ -1,9 +1,7 @@
 #include "precomp.h"
-#include "Tile.h"
 
-Tile::Tile(vec2 pos, int index) {
+Tile::Tile(vec2 pos) {
     this->pos = pos;
-    this->index = index;
 }
 
 void Tile::addTank(Tank* tank) {
